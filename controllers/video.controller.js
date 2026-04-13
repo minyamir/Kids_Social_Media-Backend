@@ -16,13 +16,23 @@ exports.uploadVideo = async (req, res) => {
     // 🔥 1. START AI SCAN
     const moderation = await analyzeVideoContent(filePath, caption);
 
-    // 🔥 2. HANDLE BAN (Permanent Lock)
+  // 🔥 2. HANDLE BAN (Permanent Lock)
     if (moderation.action === "BAN") {
+      // Update Database
       await User.findByIdAndUpdate(req.user._id, { 
-        isBanned: true, 
+        status: "banned", // Use the 'status' field from your User Schema
         banReason: moderation.reason 
       });
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath); // Delete bad video
+
+      // 🔥 INSTANT KICK: Tell the website to boot the user
+      const io = req.app.get("io"); // Get socket instance from app
+      if (io) {
+        io.to(req.user._id.toString()).emit("accountBan", { 
+          reason: moderation.reason 
+        });
+      }
+
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath); 
       return res.status(403).json({ msg: "CRITICAL VIOLATION: Account Banned." });
     }
 
@@ -51,38 +61,52 @@ exports.uploadVideo = async (req, res) => {
 };
 exports.getAllVideos = async (req, res) => {
   try {
-    // 1. Fetch videos and populate
-    // NOTE: Ensure 'userId' matches the field name in your Video Schema exactly!
-    const videos = await Video.find({ isApproved: true })
-      .populate("userId", "username avatarUrl")
-      .sort({ createdAt: -1 })
-      .lean(); // Converts to plain JS objects for better performance
+    // 🚀 STEP 1: The Aggregate Pipeline
+    const videos = await Video.aggregate([
+      { $match: { isApproved: true } }, 
+      {
+        $addFields: {
+          // Calculate score: Reposts are weighted more heavily (5x) than likes (2x)
+          rankingScore: {
+            $add: [
+              { $multiply: [{ $ifNull: ["$likesCount", 0] }, 2] },
+              { $multiply: [{ $ifNull: ["$repostsCount", 0] }, 5] }
+            ]
+          }
+        }
+      },
+      { $sort: { rankingScore: -1, createdAt: -1 } }, 
+      { $limit: 50 } 
+    ]);
 
-    // 2. The "Ghost User" Check 🛡️
-    // If a video exists but the user who made it was deleted, 
-    // .populate returns null for userId, which crashes the Frontend.
-    const filteredVideos = videos.filter(video => {
-      if (!video.userId) {
-        console.warn(`Video ${video._id} has no valid user. Skipping...`);
+    // 🚀 STEP 2: Manual Populate
+    // aggregate() returns POJOs (Plain Old JavaScript Objects), 
+    // so we use the Model's populate method manually.
+    const populatedVideos = await Video.populate(videos, { 
+      path: "userId", 
+      select: "username avatarUrl" 
+    });
+
+    // 🚀 STEP 3: The Guard Rail (Ghost User Check)
+    // This prevents the frontend from crashing if a user was deleted 
+    // but their video remained in the DB.
+    const filteredVideos = populatedVideos.filter(v => {
+      if (!v.userId) {
+        console.warn(`[DATA INTEGRITY] Video ${v._id} missing user data.`);
         return false;
       }
       return true;
     });
 
-    // 3. Always send back the object structure the Frontend expects
     res.status(200).json({ 
-      success: true,
+      success: true, 
+      count: filteredVideos.length,
       videos: filteredVideos 
     });
 
   } catch (err) {
-    // This logs the EXACT reason for the 500 error in your terminal
-    console.error("FEED_CONTROLLER_ERROR:", err.message);
-    
-    res.status(500).json({ 
-      msg: "Internal Server Error", 
-      error: err.message 
-    });
+    console.error("FEED_ERROR:", err.message);
+    res.status(500).json({ msg: "Failed to load feed", error: err.message });
   }
 };
 

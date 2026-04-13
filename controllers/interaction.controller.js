@@ -86,25 +86,23 @@ exports.toggleLike = async (req, res) => {
 exports.repostVideo = async (req, res) => {
   try {
     const { videoId } = req.body;
-    const video = await Video.findById(videoId).populate("userId", "email username");
+
+    // $inc is "Atomic" - it prevents math errors if 100 kids repost at once
+    const video = await Video.findByIdAndUpdate(
+      videoId, 
+      { $inc: { repostsCount: 1 } }, 
+      { new: true }
+    ).populate("userId", "email username");
 
     if (!video) return res.status(404).json({ msg: "Video not found" });
 
-    video.repostsCount += 1;
-    await video.save();
-
+    // Email notification logic stays the same...
     if (video.userId.email !== req.user.email) {
-      sendNotificationEmail(
-        video.userId.email,
-        req.user.username,
-        "reposted",
-        video.caption
-      ).catch(err => console.error(err));
+       sendNotificationEmail(video.userId.email, req.user.username, "reposted", video.caption);
     }
 
     res.json({ msg: "Video reposted", repostsCount: video.repostsCount });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ msg: "Server error" });
   }
 };

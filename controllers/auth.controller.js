@@ -70,16 +70,24 @@ res.json({
 exports.login = async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email });
+  
   if (!user) return res.status(404).json({ msg: "User not found" });
+
+  // 🛡️ SECURITY CHECK: Block banned users
+  if (user.status === "banned") {
+    return res.status(403).json({ 
+      msg: "Access Denied. This account has been banned for safety violations.",
+      reason: user.banReason 
+    });
+  }
 
   const match = await bcrypt.compare(password, user.passwordHash);
   if (!match) return res.status(400).json({ msg: "Incorrect password" });
 
-  // Prevent login if account is not verified
   if (!user.isVerified) return res.status(403).json({ msg: "Please verify your account first" });
 
   const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-  res.json({ token });
+  res.json({ token, user: { id: user._id, username: user.username, status: user.status } });
 };
 
 exports.getProfile = async (req, res) => {
@@ -96,14 +104,14 @@ exports.googleAuthSuccess = async (req, res) => {
     return res.redirect('http://localhost:5173/login?error=auth_failed');
   }
 
-  // Check if the scholar is already verified
+  // Final safety check: force verified status for the session
   if (!req.user.isVerified) {
-    // If NOT verified, redirect to OTP page and pass the email so the frontend knows who to verify
-    return res.redirect(`http://localhost:5173/verify-otp?email=${req.user.email}&status=unverified`);
+    await User.findByIdAndUpdate(req.user._id, { isVerified: true });
   }
 
-  // If already verified, proceed to login as normal
   const token = jwt.sign({ id: req.user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  
+  // Go straight to the success handler on frontend
   res.redirect(`http://localhost:5173/login-success?token=${token}`);
 };
 exports.updateProfile = async (req, res) => {

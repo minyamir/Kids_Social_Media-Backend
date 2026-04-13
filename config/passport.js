@@ -1,8 +1,6 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('../models/User');
-const generateOTP = require("../utils/generateOTP"); // Import your OTP utility
-const { sendWelcomeEmail } = require("../services/email.service"); // Import your email service
 
 passport.use(
   new GoogleStrategy(
@@ -21,31 +19,29 @@ passport.use(
         });
 
         if (user) {
-          // Link googleId if it's an existing email user logging in via Google for the first time
-          if (!user.googleId) {
-            user.googleId = profile.id;
-            await user.save();
-          }
+          // ✅ Link googleId if missing and FORCE verify
+          user.googleId = profile.id;
+          user.isVerified = true; 
+          await user.save();
           return done(null, user);
         }
 
-        // 2. Create a NEW UNVERIFIED user
+        // 2. Create a NEW user who is ALREADY VERIFIED
         const baseUsername = profile.displayName.replace(/\s+/g, '').toLowerCase();
         const uniqueUsername = `${baseUsername}${Math.floor(1000 + Math.random() * 9000)}`;
-        const otp = generateOTP(); // Generate the OTP for this new Google user
 
         user = await User.create({
           googleId: profile.id,
           username: uniqueUsername,
           email: userEmail,
           avatarUrl: profile.photos[0].value,
-          isVerified: false, // 🚨 Set to FALSE to force OTP check
-          otp: otp,          // 🚨 Store the OTP
-          passwordHash: "google_oauth_" + Math.random().toString(36).slice(-10),
+          isVerified: true,  // 🚀 Set to TRUE - no OTP needed
+          status: "active",  // Ensure they are active
+          // No OTP needed here
         });
 
-        // 3. Send the OTP to their email
-        await sendWelcomeEmail(userEmail, uniqueUsername, otp);
+        // 3. Optional: Send a Welcome Email (without an OTP)
+        // await sendNormalWelcomeEmail(userEmail, uniqueUsername);
 
         return done(null, user);
       } catch (err) {
@@ -55,8 +51,7 @@ passport.use(
     }
   )
 );
-// ... keep serialize/deserialize as is ...
-// Passport requires these, though JWT doesn't use sessions
+
 passport.serializeUser((user, done) => {
   done(null, user.id);
 });
