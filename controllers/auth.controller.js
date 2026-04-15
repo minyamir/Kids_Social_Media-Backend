@@ -23,7 +23,6 @@ if (!mediumPasswordRegex.test(password)) {
 } 
     const passwordHash = await bcrypt.hash(password, 10);
     const otp = generateOTP();
-
     const user = await User.create({
       username,
       email,
@@ -31,17 +30,13 @@ if (!mediumPasswordRegex.test(password)) {
       otp,
       isVerified: false
     });
-
     await sendWelcomeEmail(email, username, otp);
-
     res.json({ msg: "User created. OTP sent to email." });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Server error" });
   }
 };
-
 
 exports.verifyOtp = async (req, res) => {
   const { email, otp } = req.body;
@@ -99,19 +94,16 @@ exports.getProfile = async (req, res) => {
     res.status(500).json({ msg: "Server error" });
   }
 };
-exports.googleAuthSuccess = async (req, res) => {
-  if (!req.user) {
-    return res.redirect('http://localhost:5173/login?error=auth_failed');
-  }
-
-  // Final safety check: force verified status for the session
-  if (!req.user.isVerified) {
-    await User.findByIdAndUpdate(req.user._id, { isVerified: true });
-  }
-
-  const token = jwt.sign({ id: req.user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+exports.googleAuthSuccess = (req, res) => {
+  // We don't check isVerified here anymore. 
+  // Passport already sent the email if they were new.
   
-  // Go straight to the success handler on frontend
+  const token = jwt.sign(
+    { id: req.user._id }, 
+    process.env.JWT_SECRET, 
+    { expiresIn: '7d' }
+  );
+
   res.redirect(`http://localhost:5173/login-success?token=${token}`);
 };
 exports.updateProfile = async (req, res) => {

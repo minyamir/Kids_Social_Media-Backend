@@ -3,7 +3,7 @@ const Comment = require("../models/Comment");
 const Video = require("../models/Video");
 const Conversation = require("../models/Conversation"); // Add this
 const Message = require("../models/Message");
-const { sendNotificationEmail } = require("../services/email.service");
+const { sendWelcomeEmail,sendNotificationEmail } = require("../services/email.service");
 
 // Add comment
 exports.addComment = async (req, res) => {
@@ -266,15 +266,19 @@ exports.sendMessage = async (req, res) => {
     }
     // --- REAL-TIME TRIGGER END ---
 
-    // D. Notify Receiver (Email)
+    // D. Notify Receiver (Email) - Only if they have an email
     const receiver = await User.findById(receiverId);
-    if (receiver?.email) {
+    
+    // We only send the email if the receiver exists and has an email
+    if (receiver && receiver.email) {
+      // Logic: You can add 'if (receiver.isOffline)' here if you have that field
+      // to avoid spamming them while they are actively chatting.
+      
       sendNotificationEmail(
         receiver.email,
-        req.user.username,
-        "sent you a message",
-        text.substring(0, 30) + "..."
-      ).catch(err => console.error("Chat Email Error:", err));
+        req.user.username, // Sender's Name
+        text               // The Message Content
+      ).catch(err => console.error("Chat Email Error:", err.message));
     }
 
     res.json(newMessage);

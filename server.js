@@ -7,8 +7,11 @@ const passport = require("passport");
 const http = require("http"); 
 const { Server } = require("socket.io"); 
 
+
 dotenv.config();
 require("./config/passport"); 
+// Add this near your other requires (like after require("./config/passport"))
+const User = require("./models/User");
 
 const app = express();
 

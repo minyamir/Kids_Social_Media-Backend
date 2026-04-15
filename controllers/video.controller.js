@@ -92,7 +92,7 @@ exports.getAllVideos = async (req, res) => {
     // but their video remained in the DB.
     const filteredVideos = populatedVideos.filter(v => {
       if (!v.userId) {
-        console.warn(`[DATA INTEGRITY] Video ${v._id} missing user data.`);
+        // console.warn(`[DATA INTEGRITY] Video ${v._id} missing user data.`);
         return false;
       }
       return true;

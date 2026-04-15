@@ -7,26 +7,24 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "http://localhost:5000/api/auth/google/callback",
+      callbackURL: "http://localhost:5000/api/auth/google/callback", // 👈 Verify this matches Google Console!
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
         const userEmail = profile.emails[0].value;
-        
-        // 1. Check if user already exists
         let user = await User.findOne({ 
           $or: [{ googleId: profile.id }, { email: userEmail }] 
         });
 
         if (user) {
-          // ✅ Link googleId if missing and FORCE verify
+          // Returning user: Just update and move on
           user.googleId = profile.id;
           user.isVerified = true; 
           await user.save();
           return done(null, user);
         }
 
-        // 2. Create a NEW user who is ALREADY VERIFIED
+        // NEW USER logic
         const baseUsername = profile.displayName.replace(/\s+/g, '').toLowerCase();
         const uniqueUsername = `${baseUsername}${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -35,17 +33,19 @@ passport.use(
           username: uniqueUsername,
           email: userEmail,
           avatarUrl: profile.photos[0].value,
-          isVerified: true,  // 🚀 Set to TRUE - no OTP needed
-          status: "active",  // Ensure they are active
-          // No OTP needed here
+          isVerified: true,
         });
 
-        // 3. Optional: Send a Welcome Email (without an OTP)
-        // await sendNormalWelcomeEmail(userEmail, uniqueUsername);
+        // 🚀 Send email only for the NEW user
+        try {
+            const { sendWelcomeEmail } = require('../services/email.service');
+            sendWelcomeEmail(userEmail, uniqueUsername, "GOOGLE_AUTH");
+        } catch (emailErr) {
+            console.error("Email failed but user was created:", emailErr.message);
+        }
 
         return done(null, user);
       } catch (err) {
-        console.error("❌ Error in Google Strategy:", err);
         return done(err, null);
       }
     }
