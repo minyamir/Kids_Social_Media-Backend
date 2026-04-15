@@ -43,7 +43,16 @@ router.post("/resend-otp", resendOtp);
 // Forgot / Reset password
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password/:token", resetPassword);
-
+// TEMP TEST ROUTE
+router.post("/test-google-email", async (req, res) => {
+    const { sendWelcomeEmail } = require('../services/email.service');
+    try {
+        await sendWelcomeEmail(req.body.email, "TestScholar", "GOOGLE_AUTH");
+        res.json({ msg: "3D Google Email Sent!" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 // --- Protected routes (require JWT) ---
 router.get("/profile", authMiddleware, getProfile);
 // 🔥 ADD THIS ROUTE HERE:
