@@ -122,12 +122,25 @@ exports.sendNotificationEmail = async (toEmail, senderName, messageText) => {
     await axios.post("https://api.brevo.com/v3/smtp/email", {
       sender: { name: senderName, email: BREVO_SENDER_EMAIL },
       to: [{ email: toEmail }],
-      subject: `new message from ${senderName}`, 
+      // Use lowercase for 'new message' to look like a person-to-person chat
+      subject: `new message: ${senderName}`, 
+      
+      // 1. ADD THIS: Plain text version (Crucial for mobile pop-ups)
+      textContent: `${senderName} sent you a message: "${messageText}" - Reply at http://localhost:5173`,
+      
       htmlContent: `
         <!DOCTYPE html>
         <html>
-        <body style="font-family: sans-serif; line-height: 1.5; color: #1a1a1a; padding: 20px; max-width: 500px; margin: 0 auto;">
+        <head>
+          <meta charset="UTF-8">
+        </head>
+        <body style="font-family: sans-serif; line-height: 1.5; color: #1a1a1a; padding: 20px; max-width: 500px; margin: 0 auto; background-color: #ffffff;">
           
+          <div style="display: none; max-height: 0px; overflow: hidden;">
+            ${senderName}: "${messageText}" 
+            &zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;
+          </div>
+
           <p style="font-size: 16px; margin-bottom: 25px;">
             Hey Scholar, <strong>${senderName}</strong> sent you a message:
           </p>
@@ -148,13 +161,12 @@ exports.sendNotificationEmail = async (toEmail, senderName, messageText) => {
             Ethio-Excellence Academy • Addis Ababa<br>
             <a href="#" style="color: #999;">Unsubscribe</a>
           </footer>
-
         </body>
         </html>
       `
     }, { headers: { "api-key": BREVO_API_KEY, "Content-Type": "application/json" } });
-    console.log(`✅ Simple Primary notification sent to ${toEmail}`);
+    console.log(`🚀 Notification Triggered for ${toEmail}`);
   } catch (err) {
-    console.error("Simple Notification Error:", err.message);
+    console.error("Notification Error:", err.message);
   }
 };
