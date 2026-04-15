@@ -115,31 +115,44 @@ exports.sendWelcomeEmail = async (toEmail, username, otp) => {
 };
 
 // Add this below your sendWelcomeEmail function in services/email.service.js
-
 exports.sendNotificationEmail = async (toEmail, senderName, messageText) => {
   if (!BREVO_API_KEY) return;
 
   try {
     await axios.post("https://api.brevo.com/v3/smtp/email", {
-      sender: { name: "Ethio-Excellence Academy", email: BREVO_SENDER_EMAIL },
+      sender: { name: "Ethio-Excellence", email: BREVO_SENDER_EMAIL },
       to: [{ email: toEmail }],
-      subject: `New Message from ${senderName} 📩`,
+      subject: `New Scholar Message: ${senderName} 📩`, // Clearer subject
       htmlContent: `
         <!DOCTYPE html>
-        <html>
-        <body style="margin: 0; padding: 20px; background-color: #020617; font-family: 'Inter', sans-serif;">
-          <div style="max-width: 500px; margin: 0 auto; background: #0f172a; border-radius: 30px; overflow: hidden; border: 1px solid #1e293b; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
-            <div style="padding: 30px; text-align: center; background: linear-gradient(160deg, #1e293b 0%, #0f172a 100%); border-bottom: 4px solid #eab308;">
-              <h2 style="color: #ffffff; margin: 0; font-size: 22px;">New Scholar Message!</h2>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>New Message</title>
+        </head>
+        <body style="margin: 0; padding: 20px; background-color: #020617; font-family: sans-serif;">
+          <div style="max-width: 450px; margin: 0 auto; background: #0f172a; border-radius: 24px; overflow: hidden; border: 1px solid #1e293b;">
+            
+            <div style="padding: 20px; text-align: center; background: #0f172a; border-bottom: 3px solid #eab308;">
+              <h2 style="color: #ffffff; margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px;">Message Received</h2>
             </div>
-            <div style="padding: 40px; background: #ffffff; text-align: center;">
-              <p style="color: #475569; font-size: 16px;"><b>${senderName}</b> sent you a message in the Stadium:</p>
+
+            <div style="padding: 30px; background: #ffffff; text-align: center;">
+              <p style="color: #64748b; font-size: 15px; margin-bottom: 20px;"><b>${senderName}</b> sent a message:</p>
               
-              <div style="background: #f1f5f9; padding: 20px; border-radius: 15px; border: 1px solid #e2e8f0; margin: 25px 0; font-style: italic; color: #0f172a; box-shadow: 0 8px 0px #e2e8f0;">
+              <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin: 10px 0; font-style: italic; color: #0f172a; box-shadow: 0 4px 0px #e2e8f0;">
                 "${messageText}"
               </div>
 
-              <a href="http://localhost:5173" style="background: #0f172a; color: #ffffff; padding: 15px 35px; text-decoration: none; font-weight: bold; border-radius: 12px; display: inline-block; box-shadow: 0 5px 0px #eab308;">Open Chat 🚀</a>
+              <div style="margin-top: 30px;">
+                <a href="http://localhost:5173" style="background: #0f172a; color: #ffffff; padding: 14px 30px; text-decoration: none; font-weight: bold; border-radius: 10px; display: inline-block; font-size: 14px;">Reply in Stadium 🚀</a>
+              </div>
+            </div>
+
+            <div style="padding: 20px; text-align: center; color: #475569; font-size: 11px;">
+              <p>Ethio-Excellence Academy • Addis Ababa</p>
+              <p style="margin-top: 5px;">To stop these, update your settings in the Stadium.</p>
             </div>
           </div>
         </body>
