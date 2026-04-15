@@ -120,60 +120,41 @@ exports.sendNotificationEmail = async (toEmail, senderName, messageText) => {
 
   try {
     await axios.post("https://api.brevo.com/v3/smtp/email", {
-      // Using just the sender name makes it look personal to Gmail
       sender: { name: senderName, email: BREVO_SENDER_EMAIL },
       to: [{ email: toEmail }],
-      // Lowercase subject lines help bypass 'Promotions' filters
       subject: `new message from ${senderName}`, 
       htmlContent: `
         <!DOCTYPE html>
         <html>
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="margin: 0; padding: 0; background-color: #ffffff; font-family: -apple-system, sans-serif;">
+        <body style="font-family: sans-serif; line-height: 1.5; color: #1a1a1a; padding: 20px; max-width: 500px; margin: 0 auto;">
           
-          <div style="display: none; max-height: 0px; overflow: hidden; mso-hide: all;">
-            ${senderName}: "${messageText.substring(0, 50)}..." 
-            &zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;
-          </div>
+          <p style="font-size: 16px; margin-bottom: 25px;">
+            Hey Scholar, <strong>${senderName}</strong> sent you a message:
+          </p>
 
-          <div style="padding: 20px;">
-            <p style="color: #1a1a1a; font-size: 16px; margin-bottom: 20px;">
-              Hey, you have a new update in the archives from <strong>${senderName}</strong>:
+          <div style="background-color: #0f172a; color: #ffffff; padding: 25px; border-radius: 15px; border-left: 5px solid #eab308; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+            <p style="margin: 0; font-style: italic; font-size: 15px; color: #cbd5e1;">
+              "${messageText}"
             </p>
-
-            <div style="max-width: 360px; background: #0f172a; border-radius: 30px; overflow: hidden; border: 1px solid #1e293b; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); margin-bottom: 30px;">
-              
-              <div style="padding: 25px 20px; background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);">
-                <h1 style="color: #fff; font-size: 20px; margin: 0; letter-spacing: -0.5px;">Ethio-Excellence</h1>
-                <p style="color: #eab308; font-size: 9px; font-weight: 800; margin-top: 4px; letter-spacing: 2px;">THE SCHOLAR STADIUM</p>
-              </div>
-
-              <div style="padding: 30px 25px; background: #111827; border-top: 2px solid #eab308;">
-                <div style="background: rgba(255, 255, 255, 0.03); padding: 15px; border-radius: 12px; margin-bottom: 25px; color: #cbd5e1; font-style: italic; font-size: 14px; border-left: 3px solid #eab308; line-height: 1.5; text-align: left;">
-                  "${messageText}"
-                </div>
-                
-                <a href="http://localhost:5173" style="background: #4facfe; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 50px; display: inline-block; font-weight: 900; font-size: 12px; letter-spacing: 1px; box-shadow: 0 4px 15px rgba(79, 172, 254, 0.3);">
-                  REPLY NOW ⚡
-                </a>
-              </div>
-            </div>
-
-            <div style="color: #94a3b8; font-size: 11px; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 20px;">
-              Ethio-Excellence Academy • Addis Ababa, Ethiopia<br>
-              <a href="#" style="color: #64748b; text-decoration: underline;">Unsubscribe</a> from instant alerts.
-            </div>
           </div>
+
+          <p style="margin-top: 30px;">
+            <a href="http://localhost:5173" style="background-color: #0f172a; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+              Reply in Stadium 🚀
+            </a>
+          </p>
+
+          <footer style="margin-top: 50px; border-top: 1px solid #eee; padding-top: 15px; font-size: 11px; color: #999; text-align: center;">
+            Ethio-Excellence Academy • Addis Ababa<br>
+            <a href="#" style="color: #999;">Unsubscribe</a>
+          </footer>
+
         </body>
         </html>
       `
     }, { headers: { "api-key": BREVO_API_KEY, "Content-Type": "application/json" } });
-    
-    console.log(`🔔 Primary notification successfully sent to ${toEmail}`);
-  } catch (err) { 
-    console.error("UI Error:", err.message); 
+    console.log(`✅ Simple Primary notification sent to ${toEmail}`);
+  } catch (err) {
+    console.error("Simple Notification Error:", err.message);
   }
 };
