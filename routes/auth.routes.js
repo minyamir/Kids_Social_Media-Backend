@@ -18,6 +18,8 @@ const {
 
 // --- Google OAuth Routes ---
 
+// --- Google OAuth Routes ---
+
 // 1. Kick off the Google login process
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
@@ -25,15 +27,16 @@ router.get('/google', passport.authenticate('google', { scope: ['profile', 'emai
 router.get('/google/callback', 
   passport.authenticate('google', { session: false, failureRedirect: '/login' }),
   (req, res) => {
-    // Generate a JWT for the user that just logged in via Google
     const token = jwt.sign({ id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     
-    // Redirect to your frontend. 
-    // We pass the token in the URL so React can grab it and log the user in.
-    res.redirect(`http://localhost:5173/login-success?token=${token}`);
+    // 🔥 FIX: Redirect to Vercel in production, localhost in dev
+    const frontendUrl = process.env.NODE_ENV === 'production' 
+      ? "https://kids-scoial-media.vercel.app" 
+      : "http://localhost:5173";
+
+    res.redirect(`${frontendUrl}/login-success?token=${token}`);
   }
 );
-
 // --- Existing Public routes ---
 router.post("/register", register);
 router.post("/verify-otp", verifyOtp);
