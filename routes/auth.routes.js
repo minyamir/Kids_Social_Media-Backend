@@ -4,7 +4,7 @@ const passport = require('passport');
 const jwt = require('jsonwebtoken');
 const authMiddleware = require("../middleware/auth.middleware");
 const { uploadAvatar } = require("../middleware/upload.middleware");
-const User = require("../models/User"); // Moved to top for better performance
+const User = require("../models/User");
 
 const {
   register,
@@ -27,10 +27,10 @@ router.get('/google', passport.authenticate('google', { scope: ['profile', 'emai
 router.get('/google/callback', 
   passport.authenticate('google', { session: false, failureRedirect: '/login' }),
   (req, res) => {
-    // Sign the token
+    // Sign the token using the User ID from Google Strategy
     const token = jwt.sign({ id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     
-    // Dynamic Redirect
+    // Dynamic Redirect based on environment
     const frontendUrl = process.env.NODE_ENV === 'production' 
       ? "https://kids-scoial-media.vercel.app" 
       : "http://localhost:5173";
@@ -54,11 +54,9 @@ router.get("/profile", authMiddleware, getProfile);
 router.get("/user/:id", authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("username avatarUrl email");
-    
     if (!user) {
       return res.status(404).json({ msg: "Scholar not found in archives" });
     }
-    
     res.json(user);
   } catch (err) {
     console.error("Error fetching scholar:", err);
