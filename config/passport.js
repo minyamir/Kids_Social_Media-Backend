@@ -10,7 +10,7 @@ passport.use(
       callbackURL: "https://kids-social-media-backend.onrender.com/api/auth/google/callback",
       passReqToCallback: true
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, profile, done) => {
       try {
         const userEmail = profile.emails[0].value;
         let user = await User.findOne({ 
