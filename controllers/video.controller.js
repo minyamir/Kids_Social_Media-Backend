@@ -3,49 +3,47 @@ const User = require("../models/User");
 const { analyzeVideoContent } = require("../services/moderation.service");
 const fs = require("fs");
 const path = require("path");
-
+const cloudinary = require('cloudinary').v2;
 
 exports.uploadVideo = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ msg: "No video uploaded" });
 
     const caption = req.body.caption || "";
-    // Multer gives us the relative path (e.g., 'uploads/videos/file.mp4')
-    const filePath = req.file.path; 
+    // req.file.path is now the full https:// URL from Cloudinary
+    const videoUrl = req.file.path; 
 
-    // 🔥 1. START AI SCAN
-    const moderation = await analyzeVideoContent(filePath, caption);
+    // 🔥 1. START AI SCAN (Pass the Cloudinary URL to your service)
+    const moderation = await analyzeVideoContent(videoUrl, caption);
 
-  // 🔥 2. HANDLE BAN (Permanent Lock)
+    // 🔥 2. HANDLE BAN
     if (moderation.action === "BAN") {
-      // Update Database
       await User.findByIdAndUpdate(req.user._id, { 
-        status: "banned", // Use the 'status' field from your User Schema
+        status: "banned",
         banReason: moderation.reason 
       });
 
-      // 🔥 INSTANT KICK: Tell the website to boot the user
-      const io = req.app.get("io"); // Get socket instance from app
+      const io = req.app.get("io");
       if (io) {
-        io.to(req.user._id.toString()).emit("accountBan", { 
-          reason: moderation.reason 
-        });
+        io.to(req.user._id.toString()).emit("accountBan", { reason: moderation.reason });
       }
 
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath); 
+      // Delete the violation video from Cloudinary immediately
+      await cloudinary.uploader.destroy(req.file.filename, { resource_type: 'video' });
       return res.status(403).json({ msg: "CRITICAL VIOLATION: Account Banned." });
     }
 
-    // 🔥 3. HANDLE REJECT (Wrong Topic)
+    // 🔥 3. HANDLE REJECT
     if (moderation.action === "REJECT") {
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath); // Delete off-topic video
+      await cloudinary.uploader.destroy(req.file.filename, { resource_type: 'video' });
       return res.status(400).json({ msg: `REJECTED: ${moderation.reason}` });
     }
 
     // ✅ 4. IF APPROVED, SAVE TO DB
     const video = new Video({
       userId: req.user._id,
-      videoUrl: `/uploads/videos/${req.file.filename}`, // URL for frontend
+      videoUrl: videoUrl, // Secure HTTPS URL
+      cloudinaryId: req.file.filename, // Store this to delete later!
       caption: caption,
       isApproved: true,
       category: moderation.category || "Education"
@@ -208,15 +206,14 @@ exports.deleteVideo = async (req, res) => {
 
     if (!video) return res.status(404).json({ msg: "Video not found" });
 
-    // 🔒 Security: Check if the user owns the video
+    // 🔒 Security: Check ownership
     if (video.userId.toString() !== req.user.id) {
       return res.status(401).json({ msg: "Not authorized to delete this" });
     }
 
-    // 🗑️ 1. Delete the physical file from the 'uploads' folder
-    const filePath = path.join(__dirname, '../', video.videoUrl);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    // 🗑️ 1. Delete from Cloudinary using the stored ID
+    if (video.cloudinaryId) {
+      await cloudinary.uploader.destroy(video.cloudinaryId, { resource_type: 'video' });
     }
 
     // 🗑️ 2. Delete from Database
@@ -224,6 +221,7 @@ exports.deleteVideo = async (req, res) => {
 
     res.json({ msg: "Lesson deleted successfully" });
   } catch (err) {
+    console.error("Delete Error:", err);
     res.status(500).send("Server Error");
   }
 };

@@ -87,8 +87,12 @@ exports.login = async (req, res) => {
 
 exports.getProfile = async (req, res) => {
   try {
-    // req.user is added by authMiddleware
-    res.json({ user: req.user });
+    // 🛡️ Go to the database and get the FRESH data for this user
+    const freshUser = await User.findById(req.user._id); 
+    
+    if (!freshUser) return res.status(404).json({ msg: "User not found" });
+
+    res.json({ user: freshUser }); 
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Server error" });
@@ -113,16 +117,18 @@ exports.updateProfile = async (req, res) => {
 
     if (username) updateData.username = username;
     if (bio) updateData.bio = bio;
+
+    // 🔥 THE CRITICAL CHANGE:
+    // req.file.path is the URL provided by Cloudinary (starts with https://res.cloudinary.com)
     if (req.file) {
-      updateData.avatarUrl = `/uploads/avatars/${req.file.filename}`;
+      updateData.avatarUrl = req.file.path; 
     }
 
-    // This is safer than .save() for profile updates
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,
       { $set: updateData },
       { new: true, runValidators: true }
-    ).select("-passwordHash"); // Don't send the password back to the frontend
+    ).select("-passwordHash");
 
     if (!updatedUser) {
       return res.status(404).json({ msg: "Scholar not found" });

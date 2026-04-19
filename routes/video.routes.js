@@ -1,8 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/auth.middleware");
-
-// 1. Destructure to get specifically 'uploadVideo' from your middleware
 const { uploadVideo: videoMiddleware } = require("../middleware/upload.middleware");
 
 const { 
@@ -12,36 +10,27 @@ const {
   getUserVideos ,
   getFollowingVideos,
   searchVideos,
-  deleteVideo // Add deleteVideo to the destructuring 
+  deleteVideo 
 } = require("../controllers/video.controller");
- 
+
 // Upload a video
 router.post(
   "/upload",
   authMiddleware,
-  // 2. Use the specific video middleware tool here
+  // Using .single("video") directly is cleaner
+  videoMiddleware.single("video"), 
   (req, res, next) => {
-    videoMiddleware.single("video")(req, res, (err) => {
-      if (err) {
-        // This catches things like "Only video files allowed" or "50MB limit"
-        return res.status(400).json({ msg: err.message });
-      }
-      next();
-    });
+    if (!req.file) return res.status(400).json({ msg: "Please select a video file" });
+    next();
   },
   uploadVideo
 );
 
-// Get feed (Public)
 router.get("/feed", getAllVideos);
 router.get("/following", authMiddleware, getFollowingVideos);
-// Get logged-in user's videos (Private)
 router.get("/my-videos", authMiddleware, getUserVideos);
 router.get("/search", searchVideos);
-// Get single video by ID
 router.get("/:id", authMiddleware, getVideoById);
-
-// Delete a video
-// Route: DELETE /api/videos/:id
 router.delete("/:id", authMiddleware, deleteVideo);
+
 module.exports = router;

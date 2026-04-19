@@ -1,55 +1,43 @@
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const multer = require('multer');
 
-// Ensure directories exist
-const videoDir = "uploads/videos";
-const avatarDir = "uploads/avatars";
-
-[videoDir, avatarDir].forEach(dir => {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+// Configure Cloudinary (Make sure these are in your .env)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Storage for Videos
-const videoStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, videoDir),
-  filename: (req, file, cb) => {
-    cb(null, `video-${Date.now()}${path.extname(file.originalname)}`);
+// Cloudinary Storage for Videos
+const videoStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'scholar_stadium/videos',
+    resource_type: 'video', // This is CRITICAL for mp4/mov files
+    allowed_formats: ['mp4', 'mov', 'avi', 'mkv'],
   },
 });
 
-// Storage for Avatars
-const avatarStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, avatarDir),
-  filename: (req, file, cb) => {
-    cb(null, `avatar-${Date.now()}${path.extname(file.originalname)}`);
+// Cloudinary Storage for Avatars
+const avatarStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'scholar_stadium/avatars',
+    allowed_formats: ['jpg', 'png', 'jpeg'],
+    transformation: [{ width: 400, height: 400, crop: 'fill' }] // Auto-crop for kids' profiles
   },
 });
 
-// Filters
-const videoFilter = (req, file, cb) => {
-  file.mimetype.startsWith("video/") 
-    ? cb(null, true) 
-    : cb(new Error("Only video files allowed"), false);
-};
-
-const imageFilter = (req, file, cb) => {
-  file.mimetype.startsWith("image/") 
-    ? cb(null, true) 
-    : cb(new Error("Only image files allowed"), false);
-};
-
-// Exports
+// Export the specific uploaders
 const uploadVideo = multer({
   storage: videoStorage,
-  fileFilter: videoFilter,
-  limits: { fileSize: 50 * 1024 * 1024 }
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB
 });
 
 const uploadAvatar = multer({
   storage: avatarStorage,
-  fileFilter: imageFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit for images
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
 module.exports = { uploadVideo, uploadAvatar };
