@@ -7,23 +7,22 @@ const passport = require("passport");
 const http = require("http"); 
 const { Server } = require("socket.io"); 
 
-
 dotenv.config();
 require("./config/passport"); 
-// Add this near your other requires (like after require("./config/passport"))
 const User = require("./models/User");
 
 const app = express();
 
 // --- SOCKET.IO CONFIGURATION ---
 const server = http.createServer(app); 
-const io = require("socket.io")(server, {
+const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // Your frontend URL
+    // 🔥 FIX: Removed trailing slash for production stability
+    origin: ["http://localhost:5173", "https://kids-scoial-media.vercel.app"],
     methods: ["GET", "POST"],
     credentials: true
   },
-  transports: ["websocket", "polling"] // Allow fallback to polling if WS fails
+  transports: ["websocket", "polling"]
 });
 
 app.set("socketio", io);
@@ -34,7 +33,6 @@ io.on("connection", (socket) => {
   // --- 1. PRIVATE CHAT ROOMS ---
   socket.on("join_chat", (userId) => {
     socket.join(userId);
-    // Keep track of which user owns this socket for disconnect logic
     socket.userId = userId; 
     console.log(`👤 User joined private room: ${userId}`);
   });
@@ -45,64 +43,37 @@ io.on("connection", (socket) => {
     console.log(`🎥 Scholar ${userId} started a Live Stream`);
   });
 
-// server.js
-socket.on("sending_signal", payload => {
+  socket.on("sending_signal", payload => {
     io.to(`live_${payload.streamerId}`).emit('user_joined', { 
         signal: payload.signal, 
         callerId: payload.callerId 
     });
-});
+  });
 
-socket.on("returning_signal", payload => {
+  socket.on("returning_signal", payload => {
     io.to(payload.callerId).emit('receiving_returned_signal', { 
         signal: payload.signal, 
         id: socket.id 
     });
-});
-  socket.on("disconnect", async () => {
-    console.log("👋 User disconnected:", socket.id);
-    
-    if (socket.userId) {
-        try {
-            // This updates the DB so the Scholar disappears from the Live Stadium
-            await User.findByIdAndUpdate(socket.userId, { isLive: false });
-            console.log(`📉 Scholar ${socket.userId} is now offline.`);
-            
-            // Notify viewers so their screen can show "Stream Ended"
-            io.to(`live_${socket.userId}`).emit("stream_ended");
-        } catch (err) {
-            console.error("Error updating live status on disconnect:", err);
-        }
-    }
-});
+  });
 
- // Inside io.on("connection", (socket) => { ...
+  socket.on("join_live_room", (streamerId) => { 
+    socket.join(`live_${streamerId}`);
+    console.log(`👁️ Viewer joined room: live_${streamerId}`);
+  });
 
-// Change "join_live_stream" to "join_live_room"
-// Change this in server.js to match your frontend emit
-socket.on("join_live_room", (streamerId) => { 
-  socket.join(`live_${streamerId}`);
-  console.log(`👁️ Viewer joined room: live_${streamerId}`);
-});
+  socket.on("send_live_comment", (data) => {
+    const roomName = `live_${data.streamerId}`;
+    const comment = {
+      text: data.text,
+      username: data.username,
+      avatarUrl: data.avatarUrl,
+      createdAt: new Date()
+    };
+    io.to(roomName).emit("new_live_comment", comment);
+  });
 
-socket.on("send_live_comment", (data) => {
-  const roomName = `live_${data.streamerId}`; // MUST match start_live/join_live_room
-  
-  const comment = {
-    text: data.text,
-    username: data.username,
-    avatarUrl: data.avatarUrl,
-    createdAt: new Date()
-  };
-  
-  console.log(`💬 Broadcasting to ${roomName}: ${data.text}`);
-  
-  // Use io.to() to send to EVERYONE in the room including the sender
-  io.to(roomName).emit("new_live_comment", comment);
-});
-  // This is how the streamer sends their camera data to the viewers
   socket.on("stream_signal", (data) => {
-    // data.to is the target viewer, data.signal is the video data
     io.to(data.to).emit("receive_signal", {
       signal: data.signal,
       from: socket.id
@@ -110,34 +81,42 @@ socket.on("send_live_comment", (data) => {
   });
 
   socket.on("disconnect", async () => {
-    console.log("👋 User disconnected");
-    // Optionally update DB to say user is no longer live/online
+    console.log("👋 User disconnected:", socket.id);
+    if (socket.userId) {
+        try {
+            await User.findByIdAndUpdate(socket.userId, { isLive: false });
+            io.to(`live_${socket.userId}`).emit("stream_ended");
+            console.log(`📉 Scholar ${socket.userId} is now offline.`);
+        } catch (err) {
+            console.error("Error updating status:", err);
+        }
+    }
   });
 });
+
 // --- GLOBAL MIDDLEWARE ---
 app.use(cors({
-  origin: "http://localhost:5173",
+  // 🔥 FIX: Match the Socket.io origin exactly
+  origin: ["http://localhost:5173", "https://kids-scoial-media.vercel.app"],
   credentials: true
 }));
-app.use(express.json());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(passport.initialize());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// --- 6. ROUTE IMPORTS (THIS WAS THE MISSING PART) ---
+// --- ROUTES ---
 const authRoutes = require("./routes/auth.routes");
 const interactionRoutes = require("./routes/interaction.routes");
 const videoRoutes = require("./routes/video.routes");
 
-// --- 7. ROUTE DECLARATIONS ---
 app.use("/api/auth", authRoutes);
 app.use("/api/interaction", interactionRoutes);
 app.use("/api/videos", videoRoutes);
 
-// --- HEALTH CHECK ---
 app.get("/", (req, res) => {
-  res.send("Mini Social Backend is running 🚀");
+  res.send("Ethio-Scholar Academy Backend is running 🚀");
 });
 
 // --- DATABASE & SERVER START ---
